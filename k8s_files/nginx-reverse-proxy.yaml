@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-reverse-proxy
+  labels:
+    app: nginx-reverse-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-reverse-proxy
+  template:
+    metadata:
+      labels:
+        app: nginx-reverse-proxy
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d
+          name: nginx-config
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+data:
+  default.conf: |
+    server {
+      listen 80;
+      server_name a055ca30ad1e64f21b04dc3787da717c-580146254.us-east-1.elb.amazonaws.com;
+
+      location / {
+        proxy_pass http://pandacloud-app:3000; # Forward requests to your service
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-reverse-proxy
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx-reverse-proxy
+  ports:
+  - port: 80
+    targetPort: 80
